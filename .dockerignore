@@ -1,0 +1,33 @@
+# python envs & caches
+.venv
+venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# git / CI / local files
+.git
+.github
+*.log
+*.zip
+*.tar.gz
+*.sqlite3
+
+# data / notebooks / local artifacts (exclude large datasets)
+data/
+datasets/
+notebooks/
+*.ipynb
+
+# editor/IDE
+.vscode
+.idea
+
+# node / build artifacts (if present)
+node_modules
+dist
+build
+
+# optionally exclude model if you will download it at runtime or from blob
+shipment_delay_model_no_leakage.joblib
