@@ -34,4 +34,4 @@ build
 .envrc
 
 # optionally exclude model if it's large; remove the line if you want model baked in:
-shipment_delay_model_no_leakage.joblib
+#shipment_delay_model_no_leakage.joblib
