@@ -1,3 +1,5 @@
+# create .dockerignore with recommended content
+Set-Content -Path .dockerignore -Encoding UTF8 -Value @'
 # python envs & caches
 .venv
 venv
@@ -8,7 +10,7 @@ __pycache__
 
 # git / CI / local files
 .git
-.github
+.github/actions
 *.log
 *.zip
 *.tar.gz
@@ -29,5 +31,6 @@ node_modules
 dist
 build
 
-# optionally exclude model if you will download it at runtime or from blob
+# optionally exclude model if it's large; remove the line if you want model baked in:
 shipment_delay_model_no_leakage.joblib
+'@
