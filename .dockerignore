@@ -1,6 +1,4 @@
-# create .dockerignore with recommended content
-Set-Content -Path .dockerignore -Encoding UTF8 -Value @'
-# python envs & caches
+﻿# python envs & caches
 .venv
 venv
 __pycache__
@@ -31,6 +29,9 @@ node_modules
 dist
 build
 
+# exclude local virtual environments & heavy artifacts
+.env
+.envrc
+
 # optionally exclude model if it's large; remove the line if you want model baked in:
 shipment_delay_model_no_leakage.joblib
-'@
