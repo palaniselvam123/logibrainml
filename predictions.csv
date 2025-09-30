@@ -1,0 +1,3 @@
+company_id,working_period_id,sr_no,etd_dow,etd_month,transit_time_planned_days,no_of_transshipments,shipment_weight_kg,cargo_type,carrier_reliability_score,route_smoothed_score,weather_severity_score,holiday_flag,carrier,vessel_type,departure_port_name,destination_port_name,mode,predicted_shipment_delay_days
+150,5,1,2,3,15,1,5400,Dry Container,0.91,0.88,1,0,Maersk,Container Ship,Singapore Port,Rotterdam,Sea,5.885
+175,12,2,4,7,22,0,16000,Hazardous,0.84,0.81,3,1,MSC,Container Ship,Nhava Sheva (JNPT),Hamburg,Sea,1.5

@@ -1,0 +1,57 @@
+,importance
+shipment_weight_kg,0.10976197514193259
+no_of_transshipments,0.10270615658611137
+company_id,0.09981216904325665
+sr_no,0.09190860952380235
+transit_time_planned_days,0.08321841221496992
+working_period_id,0.06930444670328059
+carrier_reliability_score,0.06379191124547196
+weather_severity_score,0.03603860796221922
+departure_port_name_Rotterdam,0.01610748606269116
+cargo_type_Reefer,0.011687245223228884
+vessel_type_Container Ship,0.011476613785050714
+holiday_flag,0.011300811357944689
+departure_port_name_Hamburg,0.010141464530251594
+vessel_type_Bulk Carrier,0.0100510893128205
+cargo_type_Hazardous,0.009542616683454607
+vessel_type_Tanker,0.00938832012637155
+destination_port_name_Khurja ICD,0.009300592929259721
+departure_port_name_Los Angeles,0.009231252768583281
+departure_port_name_Khurja ICD,0.009230113756735193
+departure_port_name_Singapore Port,0.009024220177855173
+departure_port_name_Tianjin,0.008487251714389287
+cargo_type_Bulk,0.008404254587756958
+carrier_Yang Ming,0.00826667934388337
+destination_port_name_Tughlakabad ICD,0.00812526538665301
+carrier_MSC,0.008066140229406682
+departure_port_name_Shanghai Port,0.00795058040181884
+destination_port_name_Singapore Port,0.007694948380862345
+cargo_type_Dry Container,0.0076263394306500705
+destination_port_name_Nhava Sheva (JNPT),0.007603901580319743
+departure_port_name_Jebel Ali,0.0075053722879245815
+departure_port_name_Nhava Sheva (JNPT),0.007298777348624544
+carrier_ONE,0.007011102855803458
+carrier_Hapag-Lloyd,0.006660607426566474
+carrier_CMA CGM,0.006445536726076085
+departure_port_name_Dadri ICD,0.006432156317760412
+destination_port_name_Inland Chennai ICD,0.006314689981116616
+departure_port_name_Tughlakabad ICD,0.0061783248967447295
+destination_port_name_Laem Chabang,0.006107125330573302
+carrier_Maersk,0.006067207153628071
+destination_port_name_ICD Patli,0.006016851914684116
+destination_port_name_Jebel Ali,0.0059549710797565355
+destination_port_name_Busan,0.00574648496883444
+destination_port_name_Rotterdam,0.005643209450697503
+carrier_Evergreen,0.005616470190371687
+departure_port_name_Inland Chennai ICD,0.00555543983451653
+departure_port_name_Laem Chabang,0.005554315633725613
+departure_port_name_ICD Patli,0.005279371505203185
+destination_port_name_Hamburg,0.0051072323721467385
+destination_port_name_Dadri ICD,0.004973417972567878
+carrier_COSCO,0.004924819941335434
+departure_port_name_Busan,0.004889179771928197
+destination_port_name_Shanghai Port,0.004844495271705858
+destination_port_name_Tianjin,0.0044552131684156655
+destination_port_name_Los Angeles,0.004168150408260357
+route_smoothed_score,0.0
+mode_Sea,0.0
