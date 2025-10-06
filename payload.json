@@ -1,0 +1,23 @@
+[
+  {
+    "etd_departure": "2025-10-05T10:00:00",
+    "etd_dow": 1,
+    "etd_month": 10,
+    "company_id": 150,
+    "working_period_id": 5,
+    "sr_no": 1,
+    "transit_time_planned_days": 15,
+    "no_of_transshipments": 1,
+    "shipment_weight_kg": 5400,
+    "cargo_type": "Dry Container",
+    "carrier_reliability_score": 0.91,
+    "route_smoothed_score": 0.88,
+    "weather_severity_score": 1,
+    "holiday_flag": 0,
+    "carrier": "Maersk",
+    "vessel_type": "Container Ship",
+    "departure_port_name": "Singapore Port",
+    "destination_port_name": "Rotterdam",
+    "mode": "Sea"
+  }
+]

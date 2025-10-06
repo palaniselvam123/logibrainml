@@ -1,102 +1,189 @@
-﻿import os
+﻿# app.py
+import os
 import logging
-from typing import List, Optional, Any, Dict
-from pydantic import BaseModel, Field
-from fastapi import FastAPI, HTTPException
+import traceback
+from typing import List, Any, Dict
+
+from fastapi import FastAPI, HTTPException, Request
 import joblib
-import numpy as np
 import pandas as pd
 
-LOG = logging.getLogger("ship_delay_api")
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+LOG = logging.getLogger("shipdelay")
+LOG.setLevel(logging.INFO)
+if not LOG.handlers:
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+    LOG.addHandler(handler)
 
+# Configurable model path (file on disk)
 MODEL_PATH = os.environ.get("MODEL_PATH", "shipment_delay_model_no_leakage.joblib")
 
-app = FastAPI(title="Shipment Delay Prediction API", version="1.0")
+# Optional Azure Blob fallback settings:
+AZURE_BLOB_FALLBACK = os.environ.get("AZURE_BLOB_FALLBACK", "false").lower() in ("1", "true", "yes")
+AZURE_CONNECTION_STRING = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")  # optional
+AZURE_BLOB_CONTAINER = os.environ.get("AZURE_BLOB_CONTAINER", "models")
+AZURE_BLOB_NAME = os.environ.get("AZURE_BLOB_NAME", os.path.basename(MODEL_PATH))
 
+app = FastAPI(title="Shipment Delay Predict API")
+
+# global model variable
 model = None
 
-class PredictRecord(BaseModel):
-    # include the fields your model expects. We'll be permissive: unknown fields ignored by Pydantic when building DataFrame.
-    etd_departure: Optional[str] = None
-    etd_dow: Optional[int] = None
-    etd_month: Optional[int] = None
-    company_id: Optional[int] = None
-    working_period_id: Optional[int] = None
-    sr_no: Optional[int] = None
-    transit_time_planned_days: Optional[int] = None
-    no_of_transshipments: Optional[int] = None
-    shipment_weight_kg: Optional[float] = None
-    cargo_type: Optional[str] = None
-    carrier_reliability_score: Optional[float] = None
-    route_smoothed_score: Optional[float] = None
-    weather_severity_score: Optional[float] = None
-    holiday_flag: Optional[int] = None
-    carrier: Optional[str] = None
-    vessel_type: Optional[str] = None
-    departure_port_name: Optional[str] = None
-    destination_port_name: Optional[str] = None
-    mode: Optional[str] = None
-
-class PredictList(BaseModel):
-    __root__: List[PredictRecord]
-
-def load_model():
-    global model
+def download_model_from_blob(local_path: str) -> None:
+    """
+    Try to download the model from Azure Blob Storage into local_path.
+    Requires AZURE_STORAGE_CONNECTION_STRING to be set.
+    """
     try:
-        LOG.info("Loading model from %s ...", MODEL_PATH)
-        model = joblib.load(MODEL_PATH)
-        LOG.info("Model loaded successfully.")
+        from azure.storage.blob import BlobServiceClient  # type: ignore
     except Exception as e:
-        LOG.exception("❌ Failed to load model: %s", e)
-        model = None
+        LOG.exception("azure-storage-blob not installed or import failed: %s", e)
+        raise RuntimeError("azure-storage-blob package not installed in runtime") from e
+
+    if not AZURE_CONNECTION_STRING:
+        raise RuntimeError("AZURE_STORAGE_CONNECTION_STRING is not set")
+
+    LOG.info("Attempting to download model from blob '%s/%s' ...", AZURE_BLOB_CONTAINER, AZURE_BLOB_NAME)
+    try:
+        svc = BlobServiceClient.from_connection_string(AZURE_CONNECTION_STRING)
+        container = svc.get_container_client(AZURE_BLOB_CONTAINER)
+        blob = container.get_blob_client(AZURE_BLOB_NAME)
+        with open(local_path, "wb") as fh:
+            stream = blob.download_blob()
+            fh.write(stream.readall())
+        LOG.info("Model downloaded to %s", local_path)
+    except Exception as e:
+        LOG.exception("Failed to download model from blob: %s", e)
+        raise
+
+def load_model() -> Any:
+    """
+    Load model into global variable `model`. If file not present and AZURE_BLOB_FALLBACK is true,
+    attempt to download from Blob Storage first.
+    """
+    global model
+    if model is not None:
+        return model
+
+    # If file missing and blob fallback is enabled, try to download
+    if not os.path.exists(MODEL_PATH):
+        LOG.warning("Model file not found at %s", MODEL_PATH)
+        if AZURE_BLOB_FALLBACK:
+            try:
+                download_model_from_blob(MODEL_PATH)
+            except Exception as e:
+                LOG.exception("Blob fallback failed: %s", e)
+                raise RuntimeError(f"Model file not found and blob fallback failed: {e}") from e
+        else:
+            raise FileNotFoundError(f"Model file not found at {MODEL_PATH} and AZURE_BLOB_FALLBACK is not enabled")
+
+    LOG.info("Loading model from %s ...", MODEL_PATH)
+    try:
+        model = joblib.load(MODEL_PATH)
+        LOG.info("Model loaded: %s", getattr(model, "__class__", "unknown"))
+        return model
+    except Exception as e:
+        LOG.exception("Failed to load model: %s", e)
+        # Raise to let caller return a 500 with the traceback
+        raise
 
 @app.on_event("startup")
-def startup_event():
-    load_model()
+async def preload_model():
+    """
+    Attempt to preload the model when the worker starts. This makes /health show OK without
+    waiting for the first request. Errors are logged but won't crash the worker.
+    """
+    try:
+        load_model()
+        LOG.info("Model preloaded at startup")
+    except Exception:
+        LOG.exception("Model preload at startup failed (app will still start; model will try on first request)")
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "model_loaded": model is not None}
+    ok = model is not None
+    return {"status": "ok" if ok else "model_missing", "model_loaded": ok}
 
-@app.post("/predict/json")
-def predict_json(records: List[Dict[str, Any]]):
-    """
-    Accept a JSON array of objects (list of records). Returns list of predictions.
-    This endpoint expects the request body to be a JSON array.
-    """
-    if model is None:
-        LOG.error("Model not loaded")
-        raise HTTPException(status_code=500, detail="Model not loaded")
-    if not isinstance(records, list) or len(records) == 0:
-        raise HTTPException(status_code=422, detail="body must be a non-empty list of records")
-
-    # Convert list-of-dicts -> DataFrame; ensure consistent column ordering if needed
-    try:
-        df = pd.DataFrame(records)
-        LOG.info("Received %d records for prediction", len(df))
-        # If your pipeline needs specific preprocessing, do it here. We assume the model expects a DataFrame.
-        preds = model.predict(df)
-        # If regression, return numeric values; cast to python types
-        result = [{"prediction": float(p)} for p in preds]
-        return {"predictions": result}
-    except Exception as e:
-        LOG.exception("Prediction failed: %s", e)
-        raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
+@app.get("/")
+def root():
+    return {
+        "app": "shipment-delay-api",
+        "endpoints": ["/health", "/predict (single JSON object)", "/predict/json (JSON array)"]
+    }
 
 @app.post("/predict")
-def predict_single(record: Dict[str, Any]):
+async def predict_single(req: Request):
     """
-    Accept a single JSON object and return one prediction.
+    Expect a single JSON object (one record). Returns prediction for that single record.
     """
     if model is None:
-        LOG.error("Model not loaded")
-        raise HTTPException(status_code=500, detail="Model not loaded")
+        # Attempt to load if not preloaded
+        try:
+            load_model()
+        except FileNotFoundError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed loading model: {e}")
+
     try:
-        df = pd.DataFrame([record])
-        LOG.info("Received single record for prediction")
-        pred = model.predict(df)
-        return {"prediction": float(pred[0])}
+        payload = await req.json()
     except Exception as e:
-        LOG.exception("Prediction failed: %s", e)
-        raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Invalid JSON: {e}")
+
+    if isinstance(payload, list):
+        raise HTTPException(status_code=422, detail="This endpoint expects a single JSON object. Use /predict/json for lists.")
+
+    try:
+        df = pd.DataFrame([payload])
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Could not convert payload to DataFrame: {e}")
+
+    try:
+        clf = model
+        if hasattr(clf, "predict_proba"):
+            preds = clf.predict_proba(df)
+            return {"predictions": preds.tolist()}
+        else:
+            preds = clf.predict(df)
+            return {"predictions": preds.tolist()}
+    except Exception as e:
+        LOG.exception("Prediction failed")
+        raise HTTPException(status_code=500, detail=f"Prediction failed: {e}\n\nTrace:\n{traceback.format_exc()}")
+
+@app.post("/predict/json")
+async def predict_list(payload: List[Dict[str, Any]]):
+    """
+    Batch endpoint: expect a JSON array (list) of records.
+    """
+    if model is None:
+        try:
+            load_model()
+        except FileNotFoundError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed loading model: {e}")
+
+    if not isinstance(payload, list):
+        raise HTTPException(status_code=422, detail="Expected a JSON list/array")
+
+    try:
+        df = pd.DataFrame(payload)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Could not convert payload to DataFrame: {e}")
+
+    try:
+        clf = model
+        if hasattr(clf, "predict_proba"):
+            preds = clf.predict_proba(df)
+            return {"predictions": preds.tolist()}
+        else:
+            preds = clf.predict(df)
+            return {"predictions": preds.tolist()}
+    except Exception as e:
+        LOG.exception("Batch prediction failed")
+        raise HTTPException(status_code=500, detail=f"Prediction failed: {e}\n\nTrace:\n{traceback.format_exc()}")
+
+if __name__ == "__main__":
+    # Local dev: `python app.py` will run Uvicorn. In App Service we use gunicorn with uvicorn workers.
+    import uvicorn
+    uvicorn.run("app:app", host="0.0.0.0", port=int(os.environ.get("PORT", 8000)), log_level="info")
